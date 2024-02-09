@@ -1,0 +1,117 @@
+# SQL Data Analysis and Automation for Sales Insights: A Business Report Project
+
+## Real-world Business Report
+## Analyzed sales data to determine the top selling products in each store. Also through analysis compared which customers are the most and least likely to have bought the top-selling products in each store.
+
+## Detailed Table
+- Identify specific fields and their descriptions for the detailed table.
+CREATE TABLE detailed_table (
+   total_sales integer NOT NULL,
+   customer_id integer NOT NULL,
+   store_name integer NOT NULL,	
+   title VARCHAR(100) NOT NULL
+   );
+
+## Summary Table
+- Identify specific fields and their descriptions for the summary table.
+CREATE TABLE summary_table (
+   title VARCHAR(100) NOT NULL,
+   total_sales integer NOT NULL,
+   store_name integer NOT NULL	
+   );
+
+## Data Extraction Query: SQL query to extract raw data from the detailed table.
+
+INSERT INTO detailed_table (title, total_sales, store_name, customer_id)
+SELECT
+    f.title AS title,
+    COUNT(p.amount) AS total_sales,
+    s.store_id AS store_name,
+    c.customer_id AS customer_id
+FROM
+    payment AS p
+JOIN
+    customer AS c ON p.customer_id = c.customer_id
+JOIN
+    rental AS r ON p.rental_id = r.rental_id
+JOIN
+    inventory AS i ON r.inventory_id = i.inventory_id
+JOIN
+    film AS f ON i.film_id = f.film_id
+JOIN
+    store AS s ON i.store_id = s.store_id
+GROUP BY
+    f.title, s.store_id, c.customer_id
+ORDER BY
+    total_sales DESC;
+
+## Trigger Function: SQL code to create a trigger function.
+
+-- Create the trigger function
+CREATE OR REPLACE FUNCTION update_summary_table()
+RETURNS TRIGGER AS
+$$
+BEGIN
+  -- Update the summary table with the new data
+  INSERT INTO summary_table (title, total_sales, store_name)
+  SELECT NEW.title, SUM(NEW.total_sales), NEW.store_name
+  FROM detailed_table
+  WHERE detailed_table.title = NEW.title
+    AND detailed_table.store_name = NEW.store_name
+  GROUP BY NEW.title, NEW.store_name;
+  RETURN NEW;
+END;
+$$
+LANGUAGE plpgsql;
+
+-- Create the trigger on the detailed table
+CREATE TRIGGER update_summary_trigger
+AFTER INSERT ON detailed_table
+FOR EACH ROW
+EXECUTE FUNCTION update_summary_table();
+
+## Refresh Data Procedure: SQL code to create a stored procedure to refresh data.
+
+-- Create a stored procedure to refresh data
+CREATE OR REPLACE PROCEDURE refresh_sales_data()
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    -- Clear contents of the detailed table
+    DELETE FROM detailed_table;
+    -- Clear contents of the summary table
+    DELETE FROM summary_table;
+    -- Data extraction for detailed_table/inserting raw data from the dvdrental database into the detailed table
+    INSERT INTO detailed_table (title, total_sales, store_name, customer_id)
+    SELECT
+        f.title AS title,
+        COUNT(p.amount) AS total_sales,
+        s.store_id AS store_name,
+        c.customer_id AS customer_id
+    FROM
+        payment AS p
+        JOIN customer AS c ON p.customer_id = c.customer_id
+        JOIN rental AS r ON p.rental_id = r.rental_id
+        JOIN inventory AS i ON r.inventory_id = i.inventory_id
+        JOIN film AS f ON i.film_id = f.film_id
+        JOIN store AS s ON i.store_id = s.store_id
+    GROUP BY
+        f.title, s.store_id, c.customer_id
+    ORDER BY
+        total_sales DESC;
+
+    -- Data Extraction/Inserting data into the summary table
+    INSERT INTO summary_table (title, total_sales, store_name)
+    SELECT
+        title,
+        SUM(total_sales) AS total_sales,
+        store_name
+    FROM
+        detailed_table
+    GROUP BY
+        title, store_name;
+    -- Optionally, you can commit the transaction
+    COMMIT;
+END;
+$$;
+
