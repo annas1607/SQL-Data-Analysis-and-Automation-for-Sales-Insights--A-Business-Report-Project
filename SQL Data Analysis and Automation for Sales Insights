@@ -81,7 +81,7 @@ BEGIN
     DELETE FROM detailed_table;
     -- Clear contents of the summary table
     DELETE FROM summary_table;
-    -- Data extraction for detailed_table/inserting raw data from the dvdrental database into the detailed table
+    -- Data extraction for detailed_table/inserting raw data from the rental database into the detailed table
     INSERT INTO detailed_table (title, total_sales, store_name, customer_id)
     SELECT
         f.title AS title,
